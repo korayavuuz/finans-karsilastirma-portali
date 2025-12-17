@@ -3,110 +3,95 @@ import yfinance as yf
 import pandas as pd
 import plotly.express as px
 
-# --- 1. SAYFA AYARLARI ---
+# --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Global Finans Terminali", layout="wide", page_icon="📈")
 
-st.title("📈 Global Varlık Karşılaştırma Terminali (Dolar Bazlı)")
+st.title("📈 Global Varlık Terminali (Dolar Bazlı)")
 st.markdown("""
-Bu terminal, seçtiğiniz tüm varlıkları **Amerikan Doları (USD)** cinsine çevirerek 
-kur farkından arındırılmış gerçek performansı karşılaştırır. 
-Varlıklar başlangıç tarihinde **100** baz noktasına sabitlenir.
+Bu terminal, seçtiğiniz tüm varlıkları **günlük kur üzerinden** USD'ye çevirip 
+100 baz noktasında karşılaştırır.
 """)
 
-# --- 2. YAN MENÜ (GİRİŞLER) ---
-st.sidebar.header("Analiz Parametreleri")
-st.sidebar.markdown("[🔍 Ticker Kodlarını Bul (Yahoo Finance)](https://finance.yahoo.com/lookup)")
-
+# --- YAN MENÜ ---
+st.sidebar.header("Parametreler")
 ticker_input = st.sidebar.text_input(
-    "Sembolleri virgülle ayırarak girin (Örn: AAPL, THYAO.IS, BTC-USD):", 
-    value="AAPL, MSFT, THYAO.IS, XU100.IS"
+    "Sembolleri virgülle girin (Örn: AAPL, THYAO.IS, BTC-USD):", 
+    value="AAPL, THYAO.IS, BTC-USD"
 )
 
-# Girdiyi temizle ve listeye çevir
+# Girdiyi temizle
 secilen_hisseler = [s.strip().upper() for s in ticker_input.split(",") if s.strip()]
+start_date = st.sidebar.date_input("Başlangıç:", value=pd.to_datetime("2020-01-01"))
+end_date = st.sidebar.date_input("Bitiş:", value=pd.to_datetime("today"))
 
-# Tarih aralığı seçimi
-start_date = st.sidebar.date_input("Başlangıç Tarihi:", value=pd.to_datetime("2020-01-01"))
-end_date = st.sidebar.date_input("Bitiş Tarihi:", value=pd.to_datetime("today"))
-
-# --- 3. ANA ANALİZ MOTORU ---
 if st.sidebar.button("Analizi Başlat"):
     if secilen_hisseler:
         try:
-            with st.spinner('Veriler ve Kur bilgileri çekiliyor...'):
-                # Varlık fiyatlarını çek
-                raw_data = yf.download(secilen_hisseler, start=start_date, end=end_date)['Close']
+            with st.spinner('Veriler senkronize ediliyor...'):
+                # 1. VERİLERİ ÇEK
+                # BIST hissesi varsa USDTRY kurunu da listeye ekleyip tek seferde çekiyoruz
+                download_list = secilen_hisseler.copy()
+                if any(s.endswith(".IS") for s in secilen_hisseler):
+                    download_list.append("USDTRY=X")
                 
-                # Eğer tek bir hisse seçilirse Series döner, bunu DataFrame'e çeviriyoruz
-                if isinstance(raw_data, pd.Series):
-                    raw_data = raw_data.to_frame(name=secilen_hisseler[0])
+                # yfinance'den verileri çekiyoruz
+                all_data = yf.download(download_list, start=start_date, end=end_date)['Close']
                 
-                # BIST (.IS) hissesi var mı kontrol et ve varsa USD/TRY kurunu çek
-                bist_hisseleri = [s for s in secilen_hisseler if s.endswith(".IS")]
-                if bist_hisseleri:
-                    usd_try = yf.download("USDTRY=X", start=start_date, end=end_date)['Close']
-            
-            # Veri Temizleme: Tüm varlıkların ve kurun olduğu günleri eşle
-            # dropna() kullanarak eksik günleri siliyoruz (Senkronizasyon)
-            combined_data = raw_data.dropna()
-            
-            if not combined_data.empty:
-                # 🟢 KRİTİK: GÜNLÜK KUR DÖNÜŞTÜRME
-                # Her günü kendi tarihindeki USD/TRY kuruyla böler
-                if bist_hisseleri:
-                    for col in combined_data.columns:
-                        if col.endswith(".IS"):
-                            # Pandas, index (tarih) üzerinden otomatik eşleştirme yaparak böler
-                            combined_data[col] = combined_data[col] / usd_try
-                
-                # NORMALLEŞTİRME (V1'deki temel mantık)
-                # Tüm varlıklar ilk günün fiyatına bölünür ve 100 ile çarpılır
-                normalized_data = (combined_data / combined_data.iloc[0] * 100)
+                # Veri temizleme (Eksik günleri ffill ile doldur, sonra kalan NaN'ları sil)
+                all_data = all_data.ffill().dropna()
 
-                # --- 4. GÖRSELLEŞTİRME (PLOTLY) ---
-                st.subheader("📊 Dolar Bazlı Kümülatif Getiri Gelişimi (Başlangıç=100 USD)")
-                
-                fig = px.line(normalized_data, 
-                              labels={"value": "Dolar Bazlı Endeks", "Date": "Tarih"},
-                              template="plotly_white")
+                if not all_data.empty:
+                    # 2. DOLAR ÇEVRİMİ
+                    # Eğer sadece bir tane hisse seçildiyse yf.download Series döndürebilir, 
+                    # bunu DataFrame'e zorluyoruz.
+                    if isinstance(all_data, pd.Series):
+                        all_data = all_data.to_frame()
+                    
+                    df_final = all_data.copy()
+                    
+                    # Eğer kur verisi çekildiyse, .IS olanları böl
+                    if "USDTRY=X" in df_final.columns:
+                        kur = df_final["USDTRY=X"]
+                        for col in secilen_hisseler:
+                            if col.endswith(".IS") and col in df_final.columns:
+                                df_final[col] = df_final[col] / kur
+                        # Kuru artık grafikte göstermemek için siliyoruz
+                        df_final = df_final.drop(columns=["USDTRY=X"])
+                    
+                    # Sadece kullanıcının istediği hisseleri al (Başka sütun kalmışsa temizle)
+                    df_final = df_final[secilen_hisseler]
 
-                # Eksen ve Hover (Gezerken Tarih Görme) Ayarları
-                fig.update_xaxes(
-                    dtick="M12",             # Eksen çizgilerini yılda bir koy (Sade görünüm)
-                    tickformat="%Y",         # Eksen etiketinde sadece YIL yazsın
-                    hoverformat="%d %m %Y",  # FAREYLE ÜZERİNE GELİNCE: GÜN AY YIL GÖSTER
-                    gridcolor='lightgrey'
-                )
-                
-                fig.update_layout(
-                    hovermode="x unified",   # Tüm çizgileri aynı anda göster
-                    legend_title_text='Varlıklar',
-                    yaxis_title="Normalize Edilmiş Değer (USD)"
-                )
+                    # 3. NORMALLEŞTİRME
+                    normalized = (df_final / df_final.iloc[0] * 100)
 
-                st.plotly_chart(fig, use_container_width=True)
+                    # 4. GRAFİK (PLOTLY)
+                    st.subheader("📊 Dolar Bazlı Performans Gelişimi (Başlangıç=100)")
+                    fig = px.line(normalized, labels={"value": "Endeks (USD)", "Date": "Tarih"})
+                    
+                    fig.update_xaxes(
+                        dtick="M12", tickformat="%Y", 
+                        hoverformat="%d %m %Y", gridcolor='lightgrey'
+                    )
+                    
+                    fig.update_layout(hovermode="x unified", template="plotly_white")
+                    st.plotly_chart(fig, use_container_width=True)
 
-                # --- 5. PERFORMANS ÖZETİ (BAR GRAFİĞİ) ---
-                st.subheader("📈 Toplam Getiri (%) - Dolar Bazında")
-                
-                # Başlangıçtan sona toplam yüzde değişim
-                toplam_getiri = (normalized_data.iloc[-1] - 100).reset_index()
-                toplam_getiri.columns = ['Varlık', 'Getiri (%)']
-                toplam_getiri = toplam_getiri.sort_values(by='Getiri (%)', ascending=False)
-                
-                # Bar grafiğini tablo üzerinden çiz (Encoding hatasını önler)
-                st.bar_chart(data=toplam_getiri, x='Varlık', y='Getiri (%)')
+                    # 5. PERFORMANS ÖZETİ (HATA GİDERİLMİŞ BAR GRAFİĞİ)
+                    st.subheader("📈 Toplam Getiri (%) - USD")
+                    
+                    # Hata veren kısmı daha güvenli hale getirdik:
+                    perf_values = (normalized.iloc[-1] - 100)
+                    perf_df = pd.DataFrame({
+                        'Varlık': perf_values.index,
+                        'Getiri (%)': perf_values.values
+                    }).sort_values(by='Getiri (%)', ascending=False)
+                    
+                    st.bar_chart(data=perf_df, x='Varlık', y='Getiri (%)')
 
-                # Ham Veri Tablosu
-                with st.expander("Normalize Edilmiş Ham Verileri İncele (USD)"):
-                    st.dataframe(normalized_data)
-
-            else:
-                st.error("Seçilen tarih aralığında veriler çakışmıyor veya eksik. Lütfen tarihi değiştirin.")
-                
+                else:
+                    st.error("Seçilen tarih aralığında veri bulunamadı.")
+                    
         except Exception as e:
             st.error(f"Beklenmedik bir hata oluştu: {e}")
     else:
-        st.warning("Lütfen analiz etmek için en az bir sembol girin.")
-else:
-    st.info("Analizi başlatmak için sol menüdeki 'Analizi Başlat' butonuna tıklayın.")
+        st.warning("Lütfen sembol girin.")
