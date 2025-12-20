@@ -5,11 +5,12 @@ import plotly.express as px
 import numpy as np
 
 # --- 1. SAYFA YAPILANDIRMASI ---
-st.set_page_config(page_title="Finansal Terminal v5", layout="wide", page_icon="⚖️")
+st.set_page_config(page_title="Finansal Terminal v5.2", layout="wide", page_icon="🏛️")
 
-st.title("⚖️ Profesyonel Risk & Getiri Analiz Terminali")
+st.title("🏛️ Kur Ayarlı Stratejik Analiz Terminali")
 st.markdown("""
-Bu sürüm; varlıkları **Dolar bazına** çevirir, **normalize** eder, **korelasyon** ve **yıllık volatilite (risk)** analizlerini sunar.
+Seçtiğiniz varlıkları **Dolar bazına** çevirir, **günlük senkronizasyon** ile temizler ve 
+**Risk/Getiri** profilini çıkarır.
 """)
 
 # --- 2. YAN MENÜ ---
@@ -22,13 +23,13 @@ ticker_input = st.sidebar.text_input(
 )
 
 secilen_hisseler = [s.strip().upper() for s in ticker_input.split(",") if s.strip()]
-start_date = st.sidebar.date_input("Başlangıç:", value=pd.to_datetime("2022-01-01"))
+start_date = st.sidebar.date_input("Başlangıç:", value=pd.to_datetime("2020-01-01"))
 end_date = st.sidebar.date_input("Bitiş:", value=pd.to_datetime("today"))
 
-if st.sidebar.button("Stratejik Analizi Başlat"):
+if st.sidebar.button("Nihai Analizi Başlat"):
     if secilen_hisseler:
         try:
-            with st.spinner('Veriler işleniyor...'):
+            with st.spinner('Veri seti temizleniyor ve gürültüler (noise) siliniyor...'):
                 download_list = secilen_hisseler.copy()
                 if any(s.endswith(".IS") for s in secilen_hisseler):
                     download_list.append("USDTRY=X")
@@ -40,7 +41,7 @@ if st.sidebar.button("Stratejik Analizi Başlat"):
                     if isinstance(all_data, pd.Series): all_data = all_data.to_frame()
                     df_final = all_data.copy()
                     
-                    # 🟢 KUR DÖNÜŞTÜRME (USD BAZLI TEMİZLİK)
+                    # 🟢 GÜNLÜK KUR DÜZELTMESİ (USD BAZLI)
                     if "USDTRY=X" in df_final.columns:
                         kur = df_final["USDTRY=X"]
                         for col in secilen_hisseler:
@@ -49,61 +50,55 @@ if st.sidebar.button("Stratejik Analizi Başlat"):
                         df_final = df_final.drop(columns=["USDTRY=X"])
                     
                     df_final = df_final[secilen_hisseler]
-                    
-                    # Günlük Getiriler (Korelasyon ve Volatilite için)
                     returns = df_final.pct_change().dropna()
-                    
-                    # 🟠 NORMALLEŞTİRME (Çizgi Grafik)
                     normalized = (df_final / df_final.iloc[0] * 100)
 
-                    # --- 3. GÖRSEL ANALİZ BÖLÜMÜ ---
+                    # --- 3. GÖRSELLEŞTİRME ---
                     col1, col2 = st.columns([2, 1])
 
                     with col1:
-                        st.subheader("📊 Kümülatif Performans (Base=100 USD)")
+                        st.subheader("📊 Dolar Bazlı Getiri Gelişimi (Base=100)")
                         fig_line = px.line(normalized, template="plotly_white")
                         fig_line.update_xaxes(dtick="M12", tickformat="%Y", hoverformat="%d %m %Y")
                         fig_line.update_layout(hovermode="x unified")
                         st.plotly_chart(fig_line, use_container_width=True)
 
                     with col2:
-                        st.subheader("📈 Toplam Getiri (%)")
+                        st.subheader("📈 Toplam Kümülatif Getiri (%)")
                         perf_values = (normalized.iloc[-1] - 100)
                         perf_df = pd.DataFrame({'Varlık': perf_values.index, 'Getiri (%)': perf_values.values}).sort_values('Getiri (%)', ascending=False)
                         st.bar_chart(data=perf_df, x='Varlık', y='Getiri (%)')
 
                     st.divider()
 
-                    # --- 4. RİSK & UYUM ANALİZİ ---
+                    # --- 4. RİSK & KORELASYON ANALİZİ ---
                     risk_col, corr_col = st.columns(2)
 
                     with risk_col:
-                        st.subheader("⚡ Yıllık Volatilite (Risk Skoru)")
-                        # Yıllık Volatilite Formülü: Günlük Std * Karekök(252 İş Günü)
+                        st.subheader("⚡ Yıllıklandırılmış Risk (Volatilite %)")
                         volatility = (returns.std() * np.sqrt(252) * 100).sort_values()
-                        vol_df = pd.DataFrame({'Varlık': volatility.index, 'Yıllık Risk (%)': volatility.values})
-                        
-                        fig_vol = px.bar(vol_df, x='Yıllık Risk (%)', y='Varlık', orientation='h',
-                                         title="Düşük Bar = Daha Güvenli/Stabil", color='Yıllık Risk (%)',
-                                         color_continuous_scale='Viridis')
+                        vol_df = pd.DataFrame({'Varlık': volatility.index, 'Risk (%)': volatility.values})
+                        fig_vol = px.bar(vol_df, x='Risk (%)', y='Varlık', orientation='h', color='Risk (%)', color_continuous_scale='Reds')
                         st.plotly_chart(fig_vol, use_container_width=True)
 
                     with corr_col:
-                        st.subheader("🌡️ Korelasyon Isı Haritası")
+                        st.subheader("🌡️ Korelasyon Isı Haritası (Dolar Bazlı)")
                         corr_matrix = returns.corr()
-                        fig_heat = px.imshow(corr_matrix, text_auto=".2f", aspect="auto", 
-                                            color_continuous_scale='RdBu_r', zmin=-1, zmax=1)
+                        fig_heat = px.imshow(corr_matrix, text_auto=".2f", aspect="auto", color_continuous_scale='RdBu_r', zmin=-1, zmax=1)
                         st.plotly_chart(fig_heat, use_container_width=True)
 
-                    # --- 5. ÖZET TABLO ---
-                    st.subheader("📝 Stratejik Özet Tablosu")
-                    summary_df = pd.DataFrame({
-                        'Toplam Getiri (%)': perf_values.values,
-                        'Yıllık Risk (%)': volatility.values
-                    }, index=perf_values.index)
-                    st.table(summary_df.sort_values(by='Toplam Getiri (%)', ascending=False))
+                    # --- 5. STRATEJİK TABLO ---
+                    st.subheader("📝 Varlık Analiz Özeti")
+                    summary = pd.DataFrame({
+                        'Toplam Getiri (%)': perf_values,
+                        'Yıllık Risk (%)': volatility
+                    })
+                    st.dataframe(summary.style.highlight_max(axis=0, color='lightgreen'))
+
+                    # CSV Olarak İndirme Butonu (Raporlama İçin)
+                    st.download_button("📊 Analiz Sonuçlarını İndir (.csv)", summary.to_csv(), "analiz_raporu.csv", "text/csv")
 
                 else:
-                    st.error("Seçilen kriterlerde veri bulunamadı.")
+                    st.error("Veri bulunamadı.")
         except Exception as e:
-            st.error(f"Sistemsel Hata: {e}")
+            st.error(f"Sistem Hatası: {e}")
