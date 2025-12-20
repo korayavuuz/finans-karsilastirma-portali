@@ -88,12 +88,14 @@ if st.sidebar.button("Nihai Analizi Başlat"):
                         st.plotly_chart(fig_heat, use_container_width=True)
 
                     # --- 5. STRATEJİK TABLO ---
-                    st.subheader("📝 Varlık Analiz Özeti")
-                    summary = pd.DataFrame({
-                        'Toplam Getiri (%)': perf_values,
-                        'Yıllık Risk (%)': volatility
-                    })
-                    st.dataframe(summary.style.highlight_max(axis=0, color='lightgrey'))
+                    st.subheader("📝 Stratejik Analiz Özeti")
+                    st.markdown("💡 **Yeşil hücreler:** İlgili sütundaki en iyi (En Yüksek Getiri / En Düşük Risk) değeri gösterir.")
+                    
+                    # BOYAMA MANTIĞI: Getiri için MAX, Risk için MIN
+                    styled_df = summary_df.style.highlight_max(subset=['Toplam Getiri (%)'], color='#90ee90') \
+                                               .highlight_min(subset=['Yıllık Risk (%)'], color='#90ee90')
+                    
+                    st.dataframe(styled_df, use_container_width=True)
 
                     # CSV Olarak İndirme Butonu (Raporlama İçin)
                     st.download_button("📊 Analiz Sonuçlarını İndir (.csv)", summary.to_csv(), "analiz_raporu.csv", "text/csv")
@@ -102,5 +104,6 @@ if st.sidebar.button("Nihai Analizi Başlat"):
                     st.error("Veri bulunamadı.")
         except Exception as e:
             st.error(f"Sistem Hatası: {e}")
+
 
 
