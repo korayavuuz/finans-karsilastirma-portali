@@ -5,7 +5,7 @@ import plotly.express as px
 import numpy as np
 
 # --- 1. SAYFA YAPILANDIRMASI ---
-st.set_page_config(page_title="Finansal Terminal v5.2", layout="wide", page_icon="🏛️")
+st.set_page_config(page_title="Global Finans Terminali", layout="wide", page_icon="🏛️")
 
 st.title("🏛️ Kur Ayarlı Stratejik Analiz Terminali")
 st.markdown("""
@@ -102,4 +102,5 @@ if st.sidebar.button("Nihai Analizi Başlat"):
                     st.error("Veri bulunamadı.")
         except Exception as e:
             st.error(f"Sistem Hatası: {e}")
+
 
