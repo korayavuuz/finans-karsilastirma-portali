@@ -5,7 +5,7 @@ import plotly.express as px
 import numpy as np
 
 # --- 1. SAYFA YAPILANDIRMASI ---
-st.set_page_config(page_title="Finansal Terminal v5.4", layout="wide", page_icon="📈")
+st.set_page_config(page_title="Finansal Terminal", layout="wide", page_icon="📈")
 
 st.title("🏛️ Profesyonel Stratejik Analiz Terminali")
 st.markdown("""
@@ -92,15 +92,6 @@ if st.sidebar.button("Kapsamlı Analizi Başlat"):
 
                     st.divider()
 
-                    # --- 4. STRATEJİK ÖZET VE BOYAMA ---
-                    st.subheader("📝 Stratejik Analiz Özeti")
-                    st.markdown("💡 **Yeşil hücreler:** İlgili sütundaki en iyi (En Yüksek Getiri / En Düşük Risk) değeri gösterir.")
-                    
-                    # BOYAMA MANTIĞI: Getiri için MAX, Risk için MIN
-                    styled_df = summary_df.style.highlight_max(subset=['Toplam Getiri (%)'], color='#90ee90') \
-                                               .highlight_min(subset=['Yıllık Risk (%)'], color='#90ee90')
-                    
-                    st.dataframe(styled_df, use_container_width=True)
 
                     # --- 5. RİSK & KORELASYON ---
                     r_col, c_col = st.columns(2)
@@ -112,5 +103,16 @@ if st.sidebar.button("Kapsamlı Analizi Başlat"):
                         corr = final_normalized.pct_change().corr()
                         st.plotly_chart(px.imshow(corr, text_auto=".2f", color_continuous_scale='RdBu_r', zmin=-1, zmax=1), use_container_width=True)
 
+                    # --- 4. STRATEJİK ÖZET VE BOYAMA ---
+                    st.subheader("📝 Stratejik Analiz Özeti")
+                    st.markdown("💡 **Yeşil hücreler:** İlgili sütundaki en iyi (En Yüksek Getiri / En Düşük Risk) değeri gösterir.")
+                    
+                    # BOYAMA MANTIĞI: Getiri için MAX, Risk için MIN
+                    styled_df = summary_df.style.highlight_max(subset=['Toplam Getiri (%)'], color='#90ee90') \
+                                               .highlight_min(subset=['Yıllık Risk (%)'], color='#90ee90')
+                    
+                    st.dataframe(styled_df, use_container_width=True)
+                
                 else: st.error("Veri bulunamadı.")
         except Exception as e: st.error(f"Hata: {e}")
+
