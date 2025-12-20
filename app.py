@@ -93,7 +93,7 @@ if st.sidebar.button("Nihai Analizi Başlat"):
                         'Toplam Getiri (%)': perf_values,
                         'Yıllık Risk (%)': volatility
                     })
-                    st.dataframe(summary.style.highlight_max(axis=0, color='lightgreen'))
+                    st.dataframe(summary.style.highlight_max(axis=0, color='lightgrey'))
 
                     # CSV Olarak İndirme Butonu (Raporlama İçin)
                     st.download_button("📊 Analiz Sonuçlarını İndir (.csv)", summary.to_csv(), "analiz_raporu.csv", "text/csv")
@@ -102,3 +102,4 @@ if st.sidebar.button("Nihai Analizi Başlat"):
                     st.error("Veri bulunamadı.")
         except Exception as e:
             st.error(f"Sistem Hatası: {e}")
+
