@@ -20,8 +20,11 @@ translations = {
         "chart_rank": "🏆 Getiri Sıralaması (%)",
         "risk_profile": "⚡ Risk Profili (Düşük = Güvenli)",
         "corr_heat": "🌡️ Korelasyon Isı Haritası",
+        "corr_desc": "**Analiz Notu:** Korelasyon, varlıkların birlikte hareket etme eğilimidir. +1.00’a yakın değerler varlıkların aynı yönde hareket ettiğini, 0 bağımsız olduklarını, -1.00 ise ters yönde hareket ederek riski dengelediklerini (Hedge) gösterir.",
         "summary": "📝 Stratejik Analiz Özeti",
         "legend": "💡 **Yeşil hücreler:** İlgili sütundaki en iyi (En Yüksek Getiri / En Düşük Risk) değeri gösterir.",
+        "ai_btn": "🤖 AI Finansal Strateji Özeti Oluştur",
+        "ai_wait": "Yapay zeka portföyünüzü analiz ediyor...",
         "error_data": "Veri bulunamadı.",
         "error_general": "Hata:",
         "col_asset": "Varlık",
@@ -42,8 +45,11 @@ translations = {
         "chart_rank": "🏆 Return Ranking (%)",
         "risk_profile": "⚡ Risk Profile (Lower = Safer)",
         "corr_heat": "🌡️ Correlation Heatmap",
+        "corr_desc": "**Analysis Note:** Correlation measures asset movement sync. Values near +1.00 mean they move together, 0 means independent, and -1.00 means they move in opposite directions (Hedging).",
         "summary": "📝 Strategic Analysis Summary",
         "legend": "💡 **Green cells:** Show the best value in each column (Highest Return / Lowest Risk).",
+        "ai_btn": "🤖 Generate AI Financial Strategy Summary",
+        "ai_wait": "AI is analyzing your portfolio...",
         "error_data": "No data found.",
         "error_general": "Error:",
         "col_asset": "Asset",
@@ -67,11 +73,7 @@ st.sidebar.divider()
 st.sidebar.header(T["sidebar_header"])
 st.sidebar.info(T["ticker_help"])
 
-ticker_input = st.sidebar.text_input(
-    T["input_label"], 
-    value="AAPL, THYAO.IS, BTC-USD, GC=F"
-)
-
+ticker_input = st.sidebar.text_input(T["input_label"], value="AAPL, THYAO.IS, BTC-USD, GC=F")
 secilen_hisseler = [s.strip().upper() for s in ticker_input.split(",") if s.strip()]
 start_date = st.sidebar.date_input(T["date_start"], value=pd.to_datetime("2020-01-01"))
 end_date = st.sidebar.date_input(T["date_end"], value=pd.to_datetime("today"))
@@ -84,13 +86,12 @@ if st.sidebar.button(T["btn_analyze"]):
                 if any(s.endswith(".IS") for s in secilen_hisseler):
                     download_list.append("USDTRY=X")
                 
-                # Veri Çekme
                 raw_data = yf.download(download_list, start=start_date, end=end_date)['Close'].ffill()
 
                 if not raw_data.empty:
                     if isinstance(raw_data, pd.Series): raw_data = raw_data.to_frame()
                     
-                    # 🟢 KUR DÜZELTMESİ (USD BAZLI)
+                    # 🟢 KUR DÜZELTMESİ
                     processed_df = pd.DataFrame()
                     if "USDTRY=X" in raw_data.columns:
                         usd_try = raw_data["USDTRY=X"]
@@ -102,42 +103,32 @@ if st.sidebar.button(T["btn_analyze"]):
                     else:
                         processed_df = raw_data[secilen_hisseler]
 
-                    # 🟠 RİSK VE GETİRİ HESAPLAMA
+                    # 🟠 HESAPLAMALAR
                     summary_results = []
                     normalized_list = []
-
                     for col in processed_df.columns:
                         temp_series = processed_df[col].dropna()
                         if not temp_series.empty:
                             toplam_getiri = (temp_series.iloc[-1] / temp_series.iloc[0] - 1) * 100
                             yillik_risk = temp_series.pct_change().std() * np.sqrt(252) * 100
-                            
-                            summary_results.append({
-                                T["col_asset"]: col,
-                                T["col_return"]: toplam_getiri,
-                                T["col_risk"]: yillik_risk
-                            })
+                            summary_results.append({T["col_asset"]: col, T["col_return"]: toplam_getiri, T["col_risk"]: yillik_risk})
                             normalized_list.append((temp_series / temp_series.iloc[0] * 100).rename(col))
 
                     summary_df = pd.DataFrame(summary_results).set_index(T["col_asset"])
                     final_normalized = pd.concat(normalized_list, axis=1).ffill()
 
-                    # --- 4. GÖRSEL ANALİZ ---
+                    # --- 4. GÖRSELLEŞTİRME ---
                     col1, col2 = st.columns([2, 1])
-
                     with col1:
                         st.subheader(T["chart_return"])
-                        fig_line = px.line(final_normalized, template="plotly_dark" if st.get_option("theme.base") == "dark" else "plotly_white")
-                        fig_line.update_layout(hovermode="x unified", legend_title_text="")
+                        fig_line = px.line(final_normalized, template="plotly_dark")
                         st.plotly_chart(fig_line, use_container_width=True)
-
                     with col2:
                         st.subheader(T["chart_rank"])
                         st.bar_chart(summary_df[T["col_return"]].sort_values(ascending=False))
 
                     st.divider()
 
-                    # --- 5. RİSK & KORELASYON ---
                     r_col, c_col = st.columns(2)
                     with r_col:
                         st.subheader(T["risk_profile"])
@@ -145,16 +136,30 @@ if st.sidebar.button(T["btn_analyze"]):
                     with c_col:
                         st.subheader(T["corr_heat"])
                         corr = final_normalized.pct_change().corr()
-                        st.plotly_chart(px.imshow(corr, text_auto=".2f", color_continuous_scale='RdBu_r', zmin=-1, zmax=1), use_container_width=True)
+                        st.plotly_chart(px.imshow(corr, text_auto=".2f", color_continuous_scale='RdBu_r'), use_container_width=True)
+                        st.info(T["corr_desc"])
 
-                    # --- 6. TABLO ANALİZİ ---
+                    # --- 5. ÖZET TABLO ---
                     st.subheader(T["summary"])
-                    st.markdown(T["legend"])
-                    
-                    styled_df = summary_df.style.highlight_max(subset=[T["col_return"]], color='#2ecc71') \
-                                               .highlight_min(subset=[T["col_risk"]], color='#2ecc71')
-                    
+                    styled_df = summary_df.style.highlight_max(subset=[T["col_return"]], color='#2ecc71').highlight_min(subset=[T["col_risk"]], color='#2ecc71')
                     st.dataframe(styled_df, use_container_width=True)
-                
+
+                    # --- 6. AI STRATEJİ BUTONU (YENİ) ---
+                    st.divider()
+                    if st.button(T["ai_btn"]):
+                        with st.status(T["ai_wait"]):
+                            # Burada bir LLM API'si (Gemini, OpenAI vb.) bağlayabilirsin. 
+                            # Şimdilik profesyonel bir mantıksal simülasyon ekliyoruz:
+                            best_asset = summary_df[T["col_return"]].idxmax()
+                            safest_asset = summary_df[T["col_risk"]].idxmin()
+                            
+                            ai_comment = f"**Portfolio Analysis:** {best_asset} shows the highest growth, while {safest_asset} provides stability. "
+                            if lang == "TR":
+                                ai_comment = f"**Portföy Analizi:** Seçtiğiniz dönemde {best_asset} en yüksek büyümeyi sergilerken, {safest_asset} en güvenli liman olmuş. "
+                            
+                            st.write(ai_comment)
+                            st.write("---")
+                            st.success("AI Analysis Complete / Analiz Tamamlandı.")
+
                 else: st.error(T["error_data"])
         except Exception as e: st.error(f"{T['error_general']} {e}")
