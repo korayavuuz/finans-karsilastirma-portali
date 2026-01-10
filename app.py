@@ -48,8 +48,6 @@ translations = {
         "corr_desc": "**Analysis Note:** Correlation measures asset movement sync. Values near +1.00 mean they move together, 0 means independent, and -1.00 means they move in opposite directions (Hedging).",
         "summary": "📝 Strategic Analysis Summary",
         "legend": "💡 **Green cells:** Show the best value in each column (Highest Return / Lowest Risk).",
-        "ai_btn": "🤖 Generate AI Financial Strategy Summary",
-        "ai_wait": "AI is analyzing your portfolio...",
         "error_data": "No data found.",
         "error_general": "Error:",
         "col_asset": "Asset",
@@ -144,22 +142,6 @@ if st.sidebar.button(T["btn_analyze"]):
                     styled_df = summary_df.style.highlight_max(subset=[T["col_return"]], color='#2ecc71').highlight_min(subset=[T["col_risk"]], color='#2ecc71')
                     st.dataframe(styled_df, use_container_width=True)
 
-                    # --- 6. AI STRATEJİ BUTONU (YENİ) ---
-                    st.divider()
-                    if st.button(T["ai_btn"]):
-                        with st.status(T["ai_wait"]):
-                            # Burada bir LLM API'si (Gemini, OpenAI vb.) bağlayabilirsin. 
-                            # Şimdilik profesyonel bir mantıksal simülasyon ekliyoruz:
-                            best_asset = summary_df[T["col_return"]].idxmax()
-                            safest_asset = summary_df[T["col_risk"]].idxmin()
-                            
-                            ai_comment = f"**Portfolio Analysis:** {best_asset} shows the highest growth, while {safest_asset} provides stability. "
-                            if lang == "TR":
-                                ai_comment = f"**Portföy Analizi:** Seçtiğiniz dönemde {best_asset} en yüksek büyümeyi sergilerken, {safest_asset} en güvenli liman olmuş. "
-                            
-                            st.write(ai_comment)
-                            st.write("---")
-                            st.success("AI Analysis Complete / Analiz Tamamlandı.")
-
                 else: st.error(T["error_data"])
         except Exception as e: st.error(f"{T['error_general']} {e}")
+
