@@ -4,37 +4,87 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 
-# --- 1. SAYFA YAPILANDIRMASI ---
-st.set_page_config(page_title="Finansal Terminal", layout="wide", page_icon="📈")
+# --- 1. DİL SÖZLÜĞÜ (Dinamik İçerik) ---
+translations = {
+    "TR": {
+        "title": "🏛️ Global Finansal Analiz Terminali",
+        "intro": "Bu terminal, varlıkları **Dolar bazına** çevirir ve bağımsız risk/getiri analizlerini sunar.",
+        "sidebar_header": "Parametreler",
+        "ticker_help": "🔍 [Ticker Kodlarını Bul](https://finance.yahoo.com/lookup)",
+        "input_label": "Sembolleri girin (Örn: AAPL, THYAO.IS, BTC-USD):",
+        "date_start": "Başlangıç:",
+        "date_end": "Bitiş:",
+        "btn_analyze": "Analizi Başlat",
+        "spinner": "Veriler senkronize ediliyor ve kur gürültüsü temizleniyor...",
+        "chart_return": "📊 Dolar Bazlı Getiri Gelişimi (Base=100)",
+        "chart_rank": "🏆 Getiri Sıralaması (%)",
+        "risk_profile": "⚡ Risk Profili (Düşük = Güvenli)",
+        "corr_heat": "🌡️ Korelasyon Isı Haritası",
+        "summary": "📝 Stratejik Analiz Özeti",
+        "legend": "💡 **Yeşil hücreler:** İlgili sütundaki en iyi (En Yüksek Getiri / En Düşük Risk) değeri gösterir.",
+        "error_data": "Veri bulunamadı.",
+        "error_general": "Hata:",
+        "col_asset": "Varlık",
+        "col_return": "Toplam Getiri (%)",
+        "col_risk": "Yıllık Risk (%)"
+    },
+    "EN": {
+        "title": "🏛️ Global Financial Analysis Terminal",
+        "intro": "This terminal converts assets to **USD basis** and provides independent risk/return analysis.",
+        "sidebar_header": "Parameters",
+        "ticker_help": "🔍 [Lookup Tickers](https://finance.yahoo.com/lookup)",
+        "input_label": "Enter Tickers (e.g., AAPL, THYAO.IS, BTC-USD):",
+        "date_start": "Start Date:",
+        "date_end": "End Date:",
+        "btn_analyze": "Run Analysis",
+        "spinner": "Syncing data and cleaning currency noise...",
+        "chart_return": "📊 USD-Based Performance (Base=100)",
+        "chart_rank": "🏆 Return Ranking (%)",
+        "risk_profile": "⚡ Risk Profile (Lower = Safer)",
+        "corr_heat": "🌡️ Correlation Heatmap",
+        "summary": "📝 Strategic Analysis Summary",
+        "legend": "💡 **Green cells:** Show the best value in each column (Highest Return / Lowest Risk).",
+        "error_data": "No data found.",
+        "error_general": "Error:",
+        "col_asset": "Asset",
+        "col_return": "Total Return (%)",
+        "col_risk": "Annualized Risk (%)"
+    }
+}
 
-st.title("🏛️ Profesyonel Stratejik Analiz Terminali")
-st.markdown("""
-Bu terminal, varlıkları **Dolar bazına** çevirir ve **bağımsız risk/getiri** analizlerini sunar. 
-Tabloda en yüksek getiri ve en düşük risk otomatik olarak vurgulanır.
-""")
+# --- 2. SAYFA YAPILANDIRMASI ---
+st.set_page_config(page_title="Financial Terminal", layout="wide", page_icon="📈")
 
-# --- 2. YAN MENÜ ---
-st.sidebar.header("Parametreler")
-st.sidebar.info("🔍 [Ticker Kodlarını Bul](https://finance.yahoo.com/lookup)")
+# Dil Seçimi
+lang = st.sidebar.selectbox("🌐 Language / Dil", options=["EN", "TR"])
+T = translations[lang]
+
+st.title(T["title"])
+st.markdown(T["intro"])
+
+# --- 3. YAN MENÜ ---
+st.sidebar.divider()
+st.sidebar.header(T["sidebar_header"])
+st.sidebar.info(T["ticker_help"])
 
 ticker_input = st.sidebar.text_input(
-    "Sembolleri girin (Örn: AAPL, THYAO.IS, BTC-USD):", 
-    value="AAPL, THYAO.IS, BTC-USD, GLD"
+    T["input_label"], 
+    value="AAPL, THYAO.IS, BTC-USD, GC=F"
 )
 
 secilen_hisseler = [s.strip().upper() for s in ticker_input.split(",") if s.strip()]
-start_date = st.sidebar.date_input("Başlangıç:", value=pd.to_datetime("2020-01-01"))
-end_date = st.sidebar.date_input("Bitiş:", value=pd.to_datetime("today"))
+start_date = st.sidebar.date_input(T["date_start"], value=pd.to_datetime("2020-01-01"))
+end_date = st.sidebar.date_input(T["date_end"], value=pd.to_datetime("today"))
 
-if st.sidebar.button("Kapsamlı Analizi Başlat"):
+if st.sidebar.button(T["btn_analyze"]):
     if secilen_hisseler:
         try:
-            with st.spinner('Veriler senkronize ediliyor ve kur gürültüsü temizleniyor...'):
+            with st.spinner(T["spinner"]):
                 download_list = secilen_hisseler.copy()
                 if any(s.endswith(".IS") for s in secilen_hisseler):
                     download_list.append("USDTRY=X")
                 
-                # Ham veriyi çek (FFILL ile boşlukları doldur, DROPNA yapma ki hisseler birbirini silmesin)
+                # Veri Çekme
                 raw_data = yf.download(download_list, start=start_date, end=end_date)['Close'].ffill()
 
                 if not raw_data.empty:
@@ -52,67 +102,59 @@ if st.sidebar.button("Kapsamlı Analizi Başlat"):
                     else:
                         processed_df = raw_data[secilen_hisseler]
 
-                    # 🟠 RİSK VE GETİRİ HESAPLAMA (BAĞIMSIZ MOTOR)
-                    # Artık her hisse kendi verisiyle hesaplanır, AAPL sabit kalır.
+                    # 🟠 RİSK VE GETİRİ HESAPLAMA
                     summary_results = []
                     normalized_list = []
 
                     for col in processed_df.columns:
                         temp_series = processed_df[col].dropna()
                         if not temp_series.empty:
-                            # Performans (Getiri)
                             toplam_getiri = (temp_series.iloc[-1] / temp_series.iloc[0] - 1) * 100
-                            # Risk (Yıllık Volatilite)
                             yillik_risk = temp_series.pct_change().std() * np.sqrt(252) * 100
                             
                             summary_results.append({
-                                'Varlık': col,
-                                'Toplam Getiri (%)': toplam_getiri,
-                                'Yıllık Risk (%)': yillik_risk
+                                T["col_asset"]: col,
+                                T["col_return"]: toplam_getiri,
+                                T["col_risk"]: yillik_risk
                             })
-                            # Grafik için normalleştirme
                             normalized_list.append((temp_series / temp_series.iloc[0] * 100).rename(col))
 
-                    summary_df = pd.DataFrame(summary_results).set_index('Varlık')
+                    summary_df = pd.DataFrame(summary_results).set_index(T["col_asset"])
                     final_normalized = pd.concat(normalized_list, axis=1).ffill()
 
-                    # --- 3. GÖRSEL ANALİZ ---
+                    # --- 4. GÖRSEL ANALİZ ---
                     col1, col2 = st.columns([2, 1])
 
                     with col1:
-                        st.subheader("📊 Dolar Bazlı Getiri Gelişimi (Base=100)")
-                        fig_line = px.line(final_normalized, template="plotly_white")
-                        fig_line.update_xaxes(dtick="M12", tickformat="%Y", hoverformat="%d %m %Y")
-                        fig_line.update_layout(hovermode="x unified")
+                        st.subheader(T["chart_return"])
+                        fig_line = px.line(final_normalized, template="plotly_dark" if st.get_option("theme.base") == "dark" else "plotly_white")
+                        fig_line.update_layout(hovermode="x unified", legend_title_text="")
                         st.plotly_chart(fig_line, use_container_width=True)
 
                     with col2:
-                        st.subheader("🏆 Getiri Sıralaması (%)")
-                        st.bar_chart(summary_df['Toplam Getiri (%)'].sort_values(ascending=False))
+                        st.subheader(T["chart_rank"])
+                        st.bar_chart(summary_df[T["col_return"]].sort_values(ascending=False))
 
                     st.divider()
-
 
                     # --- 5. RİSK & KORELASYON ---
                     r_col, c_col = st.columns(2)
                     with r_col:
-                        st.subheader("⚡ Risk Profili (Düşük = Güvenli)")
-                        st.bar_chart(summary_df['Yıllık Risk (%)'].sort_values())
+                        st.subheader(T["risk_profile"])
+                        st.bar_chart(summary_df[T["col_risk"]].sort_values())
                     with c_col:
-                        st.subheader("🌡️ Korelasyon Isı Haritası")
+                        st.subheader(T["corr_heat"])
                         corr = final_normalized.pct_change().corr()
                         st.plotly_chart(px.imshow(corr, text_auto=".2f", color_continuous_scale='RdBu_r', zmin=-1, zmax=1), use_container_width=True)
 
-                    # --- 4. STRATEJİK ÖZET VE BOYAMA ---
-                    st.subheader("📝 Stratejik Analiz Özeti")
-                    st.markdown("💡 **Yeşil hücreler:** İlgili sütundaki en iyi (En Yüksek Getiri / En Düşük Risk) değeri gösterir.")
+                    # --- 6. TABLO ANALİZİ ---
+                    st.subheader(T["summary"])
+                    st.markdown(T["legend"])
                     
-                    # BOYAMA MANTIĞI: Getiri için MAX, Risk için MIN
-                    styled_df = summary_df.style.highlight_max(subset=['Toplam Getiri (%)'], color='#90ee90') \
-                                               .highlight_min(subset=['Yıllık Risk (%)'], color='#90ee90')
+                    styled_df = summary_df.style.highlight_max(subset=[T["col_return"]], color='#2ecc71') \
+                                               .highlight_min(subset=[T["col_risk"]], color='#2ecc71')
                     
                     st.dataframe(styled_df, use_container_width=True)
                 
-                else: st.error("Veri bulunamadı.")
-        except Exception as e: st.error(f"Hata: {e}")
-
+                else: st.error(T["error_data"])
+        except Exception as e: st.error(f"{T['error_general']} {e}")
