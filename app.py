@@ -8,8 +8,7 @@ import numpy as np
 translations = {
     "TR": {
         "title": "🏛️ Global Finansal Analiz Terminali",
-        "intro": "Bu terminal, varlıkları **tarihi Dolar kurlarıyla** çevirir ve bağımsız risk/getiri analizlerini sunar.",
-        "methodology": "ℹ️ **Metodoloji:** Yerel varlıklar (örn. .IS), her işlem gününün kendi kapanış kuru üzerinden USD'ye çevrilir. Analiz, bugünkü kurdan değil, geçmişteki 'gerçek' dolar maliyetinden hesaplanır.",
+        "intro": "Bu terminal, varlıkları **Tarihe dayalı Dolar bazına** çevirir ve bağımsız risk/getiri analizlerini sunar.",
         "sidebar_header": "Parametreler",
         "ticker_help": "🔍 [Ticker Kodlarını Bul](https://finance.yahoo.com/lookup)",
         "input_label": "Sembolleri girin (Örn: AAPL, THYAO.IS, BTC-USD):",
@@ -21,7 +20,7 @@ translations = {
         "chart_rank": "🏆 Getiri Sıralaması (%)",
         "risk_profile": "⚡ Risk Profili (Düşük = Güvenli)",
         "corr_heat": "🌡️ Korelasyon Isı Haritası",
-        "corr_desc": "**Analiz Notu:** Korelasyon, varlıkların birlikte hareket etme eğilimidir. +1.00 aynı yönü, 0 bağımsızlığı, -1.00 ise ters yönü (Hedge) gösterir.",
+        "corr_desc": "**Analiz Notu:** Korelasyon, varlıkların birlikte hareket etme eğilimidir. +1.00’a yakın değerler varlıkların aynı yönde hareket ettiğini, 0 bağımsız olduklarını, -1.00 ise ters yönde hareket ederek riski dengelediklerini (Hedge) gösterir.",
         "summary": "📝 Stratejik Analiz Özeti",
         "legend": "💡 **Yeşil hücreler:** İlgili sütundaki en iyi (En Yüksek Getiri / En Düşük Risk) değeri gösterir.",
         "error_data": "Veri bulunamadı.",
@@ -33,7 +32,6 @@ translations = {
     "EN": {
         "title": "🏛️ Global Financial Analysis Terminal",
         "intro": "This terminal converts assets using **historical USD rates** and provides independent risk/return analysis.",
-        "methodology": "ℹ️ **Methodology:** Local assets (e.g., .IS) are converted to USD using the exchange rate of each specific trading day. Analysis uses 'historical' costs, not today's spot rate.",
         "sidebar_header": "Parameters",
         "ticker_help": "🔍 [Lookup Tickers](https://finance.yahoo.com/lookup)",
         "input_label": "Enter Tickers (e.g., AAPL, THYAO.IS, BTC-USD):",
@@ -45,7 +43,7 @@ translations = {
         "chart_rank": "🏆 Return Ranking (%)",
         "risk_profile": "⚡ Risk Profile (Lower = Safer)",
         "corr_heat": "🌡️ Correlation Heatmap",
-        "corr_desc": "**Analysis Note:** Correlation measures asset movement sync. +1.00 means same direction, 0 means independent, and -1.00 means opposite (Hedging).",
+        "corr_desc": "**Analysis Note:** Correlation measures asset movement sync. Values near +1.00 mean they move together, 0 means independent, and -1.00 means they move in opposite directions (Hedging).",
         "summary": "📝 Strategic Analysis Summary",
         "legend": "💡 **Green cells:** Show the best value in each column (Highest Return / Lowest Risk).",
         "error_data": "No data found.",
@@ -65,7 +63,6 @@ T = translations[lang]
 
 st.title(T["title"])
 st.markdown(T["intro"])
-st.info(T["methodology"])
 
 # --- 3. YAN MENÜ ---
 st.sidebar.divider()
@@ -90,7 +87,7 @@ if st.sidebar.button(T["btn_analyze"]):
                 if not raw_data.empty:
                     if isinstance(raw_data, pd.Series): raw_data = raw_data.to_frame()
                     
-                    # 🟢 KUR DÜZELTMESİ (Günlük tarihi kurlar üzerinden)
+                    # 🟢 KUR DÜZELTMESİ
                     processed_df = pd.DataFrame()
                     if "USDTRY=X" in raw_data.columns:
                         usd_try = raw_data["USDTRY=X"]
@@ -121,7 +118,6 @@ if st.sidebar.button(T["btn_analyze"]):
                     with col1:
                         st.subheader(T["chart_return"])
                         fig_line = px.line(final_normalized, template="plotly_dark")
-                        fig_line.update_layout(hovermode="x unified", legend_title_text="")
                         st.plotly_chart(fig_line, use_container_width=True)
                     with col2:
                         st.subheader(T["chart_rank"])
@@ -141,9 +137,10 @@ if st.sidebar.button(T["btn_analyze"]):
 
                     # --- 5. ÖZET TABLO ---
                     st.subheader(T["summary"])
-                    st.markdown(T["legend"])
                     styled_df = summary_df.style.highlight_max(subset=[T["col_return"]], color='#2ecc71').highlight_min(subset=[T["col_risk"]], color='#2ecc71')
                     st.dataframe(styled_df, use_container_width=True)
 
                 else: st.error(T["error_data"])
         except Exception as e: st.error(f"{T['error_general']} {e}")
+
+
