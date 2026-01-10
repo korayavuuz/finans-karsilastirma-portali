@@ -71,7 +71,7 @@ st.sidebar.info(T["ticker_help"])
 
 ticker_input = st.sidebar.text_input(T["input_label"], value="AAPL, THYAO.IS, BTC-USD, GC=F")
 secilen_hisseler = [s.strip().upper() for s in ticker_input.split(",") if s.strip()]
-start_date = st.sidebar.date_input(T["date_start"], value=pd.to_datetime("2020-01-01"))
+start_date = st.sidebar.date_input(T["date_start"], value=pd.to_datetime("2021-01-01"))
 end_date = st.sidebar.date_input(T["date_end"], value=pd.to_datetime("today"))
 
 if st.sidebar.button(T["btn_analyze"]):
@@ -142,5 +142,6 @@ if st.sidebar.button(T["btn_analyze"]):
 
                 else: st.error(T["error_data"])
         except Exception as e: st.error(f"{T['error_general']} {e}")
+
 
 
