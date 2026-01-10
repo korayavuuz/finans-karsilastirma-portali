@@ -64,16 +64,25 @@ T = translations[lang]
 st.title(T["title"])
 st.markdown(T["intro"])
 
-# --- 3. YAN MENÜ ---
+# --- 3. YAN MENÜ VE DİNAMİK TARİH ---
 st.sidebar.divider()
 st.sidebar.header(T["sidebar_header"])
-st.sidebar.info(T["ticker_help"])
 
-ticker_input = st.sidebar.text_input(T["input_label"], value="AAPL, THYAO.IS, BTC-USD, GC=F")
+# Dinamik Tarih Hesaplama: Bugün ve 5 yıl öncesi
+today = pd.to_datetime("today")
+five_years_ago = today - pd.DateOffset(years=5)
+
+ticker_input = st.sidebar.text_input(
+    T["input_label"], 
+    value="AAPL, THYAO.IS, BTC-USD, GC=F"
+)
 secilen_hisseler = [s.strip().upper() for s in ticker_input.split(",") if s.strip()]
-start_date = st.sidebar.date_input(T["date_start"], value=pd.to_datetime("today-1825"))
-end_date = st.sidebar.date_input(T["date_end"], value=pd.to_datetime("today"))
 
+# Dinamik tarihleri inputlara atıyoruz
+start_date = st.sidebar.date_input(T["date_start"], value=five_years_ago)
+end_date = st.sidebar.date_input(T["date_end"], value=today)
+
+st.sidebar.info(T["ticker_help"])
 if st.sidebar.button(T["btn_analyze"]):
     if secilen_hisseler:
         try:
@@ -142,6 +151,7 @@ if st.sidebar.button(T["btn_analyze"]):
 
                 else: st.error(T["error_data"])
         except Exception as e: st.error(f"{T['error_general']} {e}")
+
 
 
 
